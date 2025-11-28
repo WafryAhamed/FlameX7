@@ -1,5 +1,3 @@
-
-
 import cv2
 import mediapipe as mp
 import numpy as np
@@ -35,7 +33,6 @@ UPI_NAME = os.getenv("UPI_NAME", "FlameX7 AirBurger")
 UPI_CURRENCY = os.getenv("UPI_CURRENCY", "LKR")
 
 # ---------------- MENU (FlameX7 Signature Burgers) ----------------
-# 5 burgers with PNG image paths + some additional items for realism
 menu = {
     "Signature Burgers": [
         ("FlameX7 Prime Ember", 420.00, "assets/burgers/burger1.png"),
@@ -131,12 +128,7 @@ def save_receipt(cart, gst_percent=5.0):
     return fname, total
 
 def simulate_backend_log(cart, total):
-    """
-    Simulate a backend API call (no real server).
-    In a real system, this would POST to FastAPI + MongoDB.
-    """
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    # Simple CSV log
     with open("backend_order_log.csv", "a", newline="") as f:
         w = csv.writer(f)
         w.writerow(["ORDER_AT", now, "TOTAL", f"{total:.2f}", "ITEMS", len(cart)])
@@ -145,8 +137,6 @@ def simulate_backend_log(cart, total):
         w.writerow([])
 
 def generate_upi_uri(amount):
-    # Basic UPI URI format
-    # Note: For production, ensure proper URL encoding.
     return (
         f"upi://pay?"
         f"pa={UPI_ID}"
@@ -167,9 +157,9 @@ def show_upi_qr(amount):
     y_offset = 40
     canvas[y_offset:y_offset+qr_img.shape[0], x_offset:x_offset+qr_img.shape[1]] = qr_img
 
-    cv2.putText(canvas, "Scan to Pay via UPI", (40, 25),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.7, C["neon_green"], 2, cv2.LINE_AA)
-    cv2.putText(canvas, f"Total: {amount:.2f} {UPI_CURRENCY}", (40, 335),
+    cv2.putText(canvas, "Scan to Pay via UPI", (50, 25),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.65, C["neon_green"], 2, cv2.LINE_AA)
+    cv2.putText(canvas, f"Total: {amount:.2f} {UPI_CURRENCY}", (60, 335),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA)
     cv2.imshow("FlameX7 UPI QR", canvas)
 
@@ -177,25 +167,26 @@ def oled(text):
     img = np.zeros((OLED_H, OLED_W, 3), np.uint8)
     cv2.rectangle(img, (0, 0), (OLED_W - 1, OLED_H - 1), (120, 120, 140), 2)
     title = "FlameX7 OLED"
-    cv2.putText(img, title, (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 160), 2)
+    cv2.putText(img, title, (12, 28),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 160), 2)
 
     words = text.split()
     lines = []
     line = ""
     for w in words:
-        if len(line + " " + w) > 24:
+        if len(line + " " + w) > 22:
             lines.append(line)
             line = w
         else:
             line += " " + w
-    lines.append(line)
+    if line:
+        lines.append(line)
 
-    y = 70
-    for ln in lines:
-        cv2.putText(img, ln.strip(), (15, y),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        y += 28
+    y = 60
+    for ln in lines[:5]:  # max 5 lines
+        cv2.putText(img, ln.strip(), (12, y),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
+        y += 26
 
     cv2.imshow("FlameX7 OLED Status", img)
 
@@ -214,7 +205,7 @@ def draw_glass_button(img, rect, text, hover=False):
     x1, y1, x2, y2 = rect
     w = x2 - x1
     h = y2 - y1
-    radius = min(28, h // 2 - 2)
+    radius = min(25, h // 2 - 2)
 
     if w <= 0 or h <= 0:
         return
@@ -240,48 +231,52 @@ def draw_glass_button(img, rect, text, hover=False):
     np.copyto(region, region * (1 - mask_color) + glass * mask_color,
               where=(mask[:, :, None] > 0))
 
-    border_col = (90, 90, 110)
+    border_col = (80, 80, 100)
     if hover:
         border_col = C["accent"]
-        brighten = np.clip(region + 16, 0, 255).astype(np.uint8)
+        brighten = np.clip(region + 18, 0, 255).astype(np.uint8)
         np.copyto(region, np.where(mask[:, :, None] > 0, brighten, region))
 
     mask_uint = mask.astype(np.uint8)
     contours, _ = cv2.findContours(mask_uint, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    cv2.drawContours(img[y1:y2, x1:x2], contours, -1, border_col, 3, lineType=cv2.LINE_AA)
-
-    shadow_col = (20, 20, 30)
-    cv2.rectangle(img, (x1 + 4, y1 + 6), (x2 + 6, y2 + 10), shadow_col, 1)
+    cv2.drawContours(img[y1:y2, x1:x2], contours, -1, border_col, 2, lineType=cv2.LINE_AA)
 
     if hover:
         glow = np.zeros_like(region, dtype=np.uint8)
-        cv2.rectangle(glow, (6, 6), (w - 6, h - 6), (255, 240, 180), -1)
+        cv2.rectangle(glow, (8, 8), (w - 8, h - 8), (255, 240, 200), -1)
         glow = cv2.GaussianBlur(glow, (31, 31), 0)
-        alpha = 0.07
+        alpha = 0.08
         region[:] = cv2.addWeighted(region, 1.0, glow.astype(np.uint8), alpha, 0)
 
-    font_scale = 0.9 if len(text) < 28 else 0.7
+    # Adjust font scaling for better fit
+    max_chars = 28
+    if len(text) > max_chars:
+        font_scale = 0.65
+        max_chars = 32
+    else:
+        font_scale = 0.85
+
     (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 2)
-    tx = x1 + max(20, (w - tw) // 2)
-    ty = y1 + max(38, (h + th) // 2 - 6)
+    tx = x1 + max(15, (w - tw) // 2)
+    ty = y1 + max(28, (h + th) // 2 - 4)
     cv2.putText(img, text, (tx, ty), cv2.FONT_HERSHEY_SIMPLEX,
                 font_scale, C["text_dark"], 2, cv2.LINE_AA)
 
 def draw_hover_circle(frame, pos, t):
     cx, cy = pos
-    r_outer = 22 + int(6 * (0.5 + 0.5 * math.sin(t * 6)))
+    r_outer = 20 + int(5 * (0.5 + 0.5 * math.sin(t * 6)))
     cv2.circle(frame, (cx, cy), r_outer, C["neon_green"], 2, lineType=cv2.LINE_AA)
-    cv2.circle(frame, (cx, cy), 10, C["neon_green"], -1, lineType=cv2.LINE_AA)
+    cv2.circle(frame, (cx, cy), 8, C["neon_green"], -1, lineType=cv2.LINE_AA)
 
 # ---------------- RENDER PER SCREEN ----------------
 def render_screen_base(frame, buttons, draw_extra=None):
     canvas = frame.copy()
     cv2.rectangle(canvas, (0, 0), (WIDTH, 80), C["header"], -1)
 
-    cv2.putText(canvas, "FlameX7 AirBurger", (20, 54),
-                cv2.FONT_HERSHEY_SIMPLEX, 1.7, C["neon_blue"], 4, cv2.LINE_AA)
-    cv2.putText(canvas, "FlameX7 AirBurger", (20, 54),
-                cv2.FONT_HERSHEY_SIMPLEX, 1.7, (10, 10, 20), 2, cv2.LINE_AA)
+    cv2.putText(canvas, "FlameX7 AirBurger", (30, 52),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.6, C["neon_blue"], 4, cv2.LINE_AA)
+    cv2.putText(canvas, "FlameX7 AirBurger", (30, 52),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.6, (10, 10, 20), 2, cv2.LINE_AA)
 
     for b in buttons:
         draw_glass_button(canvas, b["rect"], b["label"], hover=False)
@@ -294,7 +289,7 @@ def render_screen_base(frame, buttons, draw_extra=None):
 
     cv2.putText(canvas,
                 f"Items: {total_items}   Total: {total:.2f} {UPI_CURRENCY}",
-                (20, HEIGHT - 20),
+                (30, HEIGHT - 22),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
 
     return canvas
@@ -308,14 +303,19 @@ def build_buttons_for_screen(screen):
             ("payment", "Pay & Generate QR"),
             ("exit", "Exit"),
         ]
-        bw, bh = 350, 120
-        sx, sy = 80, 150
-        gap = 40
+        bw, bh = 320, 110
+        gap_x, gap_y = 60, 30
+        start_y = 160
+        cols = 2
+        rows = 2
+        total_width = cols * bw + (cols - 1) * gap_x
+        start_x = (WIDTH - total_width) // 2
+
         idx = 0
-        for r in range(2):
-            for c in range(2):
-                x1 = sx + c * (bw + gap)
-                y1 = sy + r * (bh + gap)
+        for r in range(rows):
+            for c in range(cols):
+                x1 = start_x + c * (bw + gap_x)
+                y1 = start_y + r * (bh + gap_y)
                 buttons.append({
                     "id": items[idx][0],
                     "label": items[idx][1],
@@ -325,29 +325,27 @@ def build_buttons_for_screen(screen):
 
     elif screen == "categories":
         cats = list(menu.keys()) + ["Back to Home"]
-        sx, sy = 80, 150
-        bw, bh = 780, 70
-        gap = 15
+        sx = 100
+        bw = WIDTH - 2 * sx
+        bh = 65
+        gap = 18
+        sy = 140
         for i, c in enumerate(cats):
-            if c == "Back to Home":
-                buttons.append({
-                    "id": "home",
-                    "label": c,
-                    "rect": (sx, sy + i * (bh + gap), sx + bw, sy + i * (bh + gap) + bh)
-                })
-            else:
-                buttons.append({
-                    "id": "cat",
-                    "label": c,
-                    "rect": (sx, sy + i * (bh + gap), sx + bw, sy + i * (bh + gap) + bh)
-                })
+            y1 = sy + i * (bh + gap)
+            buttons.append({
+                "id": "home" if c == "Back to Home" else "cat",
+                "label": c,
+                "rect": (sx, y1, sx + bw, y1 + bh)
+            })
 
     elif screen == "items":
         cat = state["current_category"] or "Signature Burgers"
         items = menu[cat]
-        sx, sy = 40, 150
-        bw, bh = 580, 70
-        gap = 12
+        sx = 60
+        bw = 560
+        bh = 68
+        gap = 14
+        sy = 140
         for i, (name, price, img_path) in enumerate(items):
             label = f"{name}   {price:.2f}"
             buttons.append({
@@ -356,74 +354,80 @@ def build_buttons_for_screen(screen):
                 "meta": {"name": name, "price": price, "img_path": img_path},
                 "rect": (sx, sy + i * (bh + gap), sx + bw, sy + i * (bh + gap) + bh)
             })
+        # Action buttons on right
+        right_x = WIDTH - 220
         buttons.append({"id": "categories", "label": "Back to Categories",
-                        "rect": (680, 150, 880, 220)})
+                        "rect": (right_x, 150, right_x + 200, 210)})
         buttons.append({"id": "cart", "label": "View Cart",
-                        "rect": (680, 250, 880, 320)})
+                        "rect": (right_x, 240, right_x + 200, 300)})
 
     elif screen == "cart":
-        sx, sy = 40, 150
-        bw, bh = 580, 70
-        gap = 12
-        for i, it in enumerate(state["cart"]):
-            label = f"{it['name']}   {it['price']:.2f}   Qty: {it['qty']}"
-            rect = (sx, sy + i * (bh + gap), sx + bw, sy + i * (bh + gap) + bh)
-            buttons.append({
-                "id": "row",
-                "label": label,
-                "rect": rect,
-                "meta": {"idx": i}
-            })
-            buttons.append({
-                "id": "plus",
-                "label": "+",
-                "rect": (680, sy + i * (bh + gap), 740, sy + i * (bh + gap) + 34),
-                "meta": {"idx": i}
-            })
-            buttons.append({
-                "id": "minus",
-                "label": "-",
-                "rect": (680, sy + i * (bh + gap) + 36, 740, sy + i * (bh + gap) + 70),
-                "meta": {"idx": i}
-            })
+        if not state["cart"]:
+            # Show empty message
+            pass
+        else:
+            sx = 60
+            bw = 560
+            bh = 68
+            gap = 14
+            sy = 140
+            for i, it in enumerate(state["cart"]):
+                label = f"{it['name']}   {it['price']:.2f}   Qty: {it['qty']}"
+                rect = (sx, sy + i * (bh + gap), sx + bw, sy + i * (bh + gap) + bh)
+                buttons.append({
+                    "id": "row",
+                    "label": label,
+                    "rect": rect,
+                    "meta": {"idx": i}
+                })
+                # +/- buttons
+                plus_rect = (WIDTH - 140, sy + i * (bh + gap), WIDTH - 80, sy + i * (bh + gap) + 33)
+                minus_rect = (WIDTH - 140, sy + i * (bh + gap) + 35, WIDTH - 80, sy + i * (bh + gap) + 68)
+                buttons.append({"id": "plus", "label": "+", "rect": plus_rect, "meta": {"idx": i}})
+                buttons.append({"id": "minus", "label": "-", "rect": minus_rect, "meta": {"idx": i}})
+
+        # Bottom action buttons
+        btn_w, btn_h = 240, 60
+        btn_left = (WIDTH - 2 * btn_w - 30) // 2
         buttons.append({"id": "payment", "label": "Proceed to Payment",
-                        "rect": (680, 420, 880, 500)})
+                        "rect": (btn_left, HEIGHT - 110, btn_left + btn_w, HEIGHT - 50)})
         buttons.append({"id": "home", "label": "Back to Home",
-                        "rect": (680, 520, 880, 600)})
+                        "rect": (btn_left + btn_w + 30, HEIGHT - 110, btn_left + 2 * btn_w + 30, HEIGHT - 50)})
 
     elif screen == "payment":
         subtotal, gst, total = compute_totals()
+        btn_w, btn_h = 400, 65
+        btn_x = (WIDTH - btn_w) // 2
         buttons.append({"id": "confirm",
                         "label": f"Confirm & Show UPI QR ({total:.2f} {UPI_CURRENCY})",
-                        "rect": (160, 260, 840, 340)})
+                        "rect": (btn_x, 300, btn_x + btn_w, 300 + btn_h)})
         buttons.append({"id": "home",
                         "label": "Back to Home",
-                        "rect": (300, 360, 700, 430)})
+                        "rect": (btn_x, 390, btn_x + btn_w, 390 + btn_h)})
 
     elif screen == "paid":
+        btn_w, btn_h = 280, 60
+        btn_x = (WIDTH - btn_w) // 2
         buttons.append({"id": "home",
                         "label": "Back to Home",
-                        "rect": (320, 400, 680, 480)})
+                        "rect": (btn_x, 420, btn_x + btn_w, 420 + btn_h)})
 
     return buttons
 
 def draw_extra_payment(canvas):
     subtotal, gst, total = compute_totals()
+    y_offset = 140
     cv2.putText(canvas, f"Subtotal: {subtotal:.2f} {UPI_CURRENCY}",
-                (200, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.9,
+                (WIDTH // 2 - 160, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.85,
                 (255, 255, 255), 2, cv2.LINE_AA)
     cv2.putText(canvas, f"GST (5%): {gst:.2f} {UPI_CURRENCY}",
-                (200, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.9,
+                (WIDTH // 2 - 160, y_offset + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.85,
                 (255, 255, 255), 2, cv2.LINE_AA)
     cv2.putText(canvas, f"TOTAL: {total:.2f} {UPI_CURRENCY}",
-                (200, 220), cv2.FONT_HERSHEY_SIMPLEX, 1.0,
+                (WIDTH // 2 - 160, y_offset + 75), cv2.FONT_HERSHEY_SIMPLEX, 1.0,
                 C["neon_green"], 3, cv2.LINE_AA)
 
 def draw_extra_items(canvas, buttons):
-    """
-    On items screen, show burger thumbnails for Signature Burgers
-    to the left of each button if an image is available.
-    """
     for b in buttons:
         if b["id"] != "add":
             continue
@@ -435,16 +439,16 @@ def draw_extra_items(canvas, buttons):
 
         rect = b["rect"]
         x1, y1, x2, y2 = rect
-        thumb_h = y2 - y1 - 10
-        thumb_w = thumb_h
+        thumb_h = y2 - y1 - 8
+        thumb_w = int(thumb_h * 0.9)
         thumb = cv2.resize(img, (thumb_w, thumb_h))
-        tx = x2 + 15
-        ty = y1 + 5
-        if tx + thumb_w <= WIDTH - 20:
+        tx = x2 + 12
+        ty = y1 + 4
+        if tx + thumb_w <= WIDTH - 15:
             canvas[ty:ty+thumb_h, tx:tx+thumb_w] = thumb
             cv2.rectangle(canvas, (tx, ty),
                           (tx + thumb_w, ty + thumb_h),
-                          (40, 40, 60), 2)
+                          (40, 40, 60), 1)
 
 # ---------------- SLIDE-LEFT ANIMATION ----------------
 def animate_slide_left(current_frame, next_frame, steps=ANIM_FRAMES):
@@ -521,7 +525,7 @@ while True:
         prev_iy = int(prev_iy * SMOOTH_ALPHA + raw_iy * (1 - SMOOTH_ALPHA))
         ix, iy = prev_ix, prev_iy
 
-        cv2.circle(out_frame, (ix, iy), 6, C["neon_green"], -1)
+        cv2.circle(out_frame, (ix, iy), 5, C["neon_green"], -1)
         hovered = None
 
         for b in buttons:
