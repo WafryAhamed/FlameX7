@@ -1,0 +1,18 @@
+# FlameX7 AirBurger - Dependencies
+# Computer Vision & Hand Detection
+opencv-python==4.8.1.78
+mediapipe==0.10.5
+numpy==1.24.3
+
+# Payment & QR Code Generation
+qrcode[pil]==7.4.2
+Pillow==10.0.0
+
+# Text-to-Speech & Audio
+pyttsx3==2.90
+
+# Environment Configuration
+python-dotenv==1.0.0
+
+# Optional: For enhanced performance
+scipy==1.11.2
