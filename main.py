@@ -253,9 +253,10 @@ def draw_glass_button(img, rect, text, hover=False, progress=0.0):
     # ===================================
 
     mask = rounded_rect_mask(w, h, radius)
-    mask3 = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR) // 255
+    mask3 = (cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR) // 255).astype(np.uint8)
     region = img[y1:y2, x1:x2]
-    np.copyto(region, region * (1 - mask3) + glass * mask3, where=(mask[..., None] > 0))
+    blended_region = (region * (1 - mask3) + glass * mask3).astype(np.uint8)
+    np.copyto(region, blended_region)
 
     border_col = C["accent"] if hover else (80, 80, 100)
     mask_uint = mask.astype(np.uint8)

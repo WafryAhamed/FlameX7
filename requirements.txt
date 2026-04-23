@@ -3,6 +3,7 @@
 opencv-python==4.8.1.78
 mediapipe==0.10.5
 numpy==1.24.3
+protobuf==4.25.3
 
 # Payment & QR Code Generation
 qrcode[pil]==7.4.2
