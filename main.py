@@ -1,5 +1,6 @@
 import cv2
 import mediapipe as mp
+from mediapipe import solutions
 import numpy as np
 import math
 import time
@@ -491,13 +492,13 @@ def animate_slide_left(current_frame, next_frame, steps=ANIM_FRAMES):
             break
 
 # ---------------- MAIN APP ----------------
-mp_hands = mp.solutions.hands
+mp_hands = solutions.hands
 hands = mp_hands.Hands(
     max_num_hands=1,
     min_detection_confidence=0.6,
     min_tracking_confidence=0.6
 )
-mp_draw = mp.solutions.drawing_utils
+mp_draw = solutions.drawing_utils
 
 cap = cv2.VideoCapture(0)
 
@@ -526,7 +527,7 @@ while True:
     lm = None
     if res.multi_hand_landmarks:
         mp_draw.draw_landmarks(frame, res.multi_hand_landmarks[0],
-                               mp_hands.HAND_CONNECTIONS)
+                               solutions.hands.HAND_CONNECTIONS)
         h, w = frame.shape[:2]
         lm = [(int(p.x * w), int(p.y * h))
               for p in res.multi_hand_landmarks[0].landmark]
